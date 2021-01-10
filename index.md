@@ -4,13 +4,13 @@ This repo contains some of my thoughts related to solving the ARC dataset ([pape
 
 ## A toy problem: Finding the "odd one out" vector
 
-We have N vectors. N-1 of them are equal to each other, and the one that's left is different, i.e. inequal to the others. The task is to identify the "odd one out". A normal transformer ([paper](https://arxiv.org/pdf/1706.03762.pdf)) isn't capable of solving it, if the vectors are initialized randomly.
+We have N vectors. N-1 of them are equal to each other, and the one that's left is different, i.e. inequal to the others. The task is to identify the "odd one out". In my tests, a normal transformer ([paper](https://arxiv.org/pdf/1706.03762.pdf)) isn't capable of solving it, if the vectors are initialized randomly before every training step. It *can* be solved, quite trivially, if the vectors are initialized once in the beginning of the program.
 
-We can make the observation that this is more or less a counting task: Find the vector that only appears once in the data. So we can make a hypothesis: transformers are incapable of counting abstractly.
+We can make the observation that this is more or less a counting task: Find the vector that only appears once in the data. So we can make a hypothesis: transformers are incapable of counting abstractly. It probably has something to do with the classification not being linearly separable.
 
 ## Counting
 
-Let's define a toy dataset: `[1, 8, 5, 5, 3, 1, 5]`
+Let's define a toy dataset: `[1, 8, 5, 5, 3, 1, 5]` Here, N=7, and for simplicity, the vectors are of length 1, i.e. scalars.
 
 Can we count "similar vectors" using something that looks like a transformer? We can just test equality and count them to get a dictionary-like structure like: `[1:2, 8:1, 5:3, 3:1]`, since there are two 1s, one 8, three 5s and one 3. However, that doesn't work with transformers, because the output should always be the same size as the input.
 
@@ -33,6 +33,8 @@ How to calculate something like that? We can do a pairwise equality calculation 
 ```
 
 We see that the resulting matrix is symmetric, because a==b implies b==a. We can sum-reduce the matrix along one of the dimensions (it doesn't matter which one, since the matrix is symmetric), to get `[2, 1, 3, 3, 1, 2, 3]`, which is exactly what we wanted.
+
+This also solves the toy problem we defined earlier, as the result will be something like `[N-1, N-1, ... , 1, ... , N-1]`, which is linearly separable.
 
 ## Differentiable counting
 
