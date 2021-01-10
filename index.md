@@ -32,15 +32,11 @@ How to calculate something like that? We can do a pairwise equality calculation 
 [0, 0, 1, 1, 0, 0, 1]
 ```
 
-We see that the resulting matrix is symmetric, because a==b implies b==a. We can sum-reduce the matrix along one of the dimensions (it doesn't matter which one, since the matrix is symmetric), to get:
-
-`[2, 1, 3, 3, 1, 2, 3]`
-
-, which is exactly what we wanted.
+We see that the resulting matrix is symmetric, because a==b implies b==a. We can sum-reduce the matrix along one of the dimensions (it doesn't matter which one, since the matrix is symmetric), to get `[2, 1, 3, 3, 1, 2, 3]`, which is exactly what we wanted.
 
 ## Differentiable counting
 
-However, the method has a gradient of 0, so it cannot be used in a neural network. We can try cosine similarity.
+However, the method has a gradient of 0, so it cannot be used in a neural network. We can try, for example, cosine similarity.
 
 
 ## Comparing counting to transformer attention
