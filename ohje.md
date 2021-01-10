@@ -43,3 +43,7 @@ Having trouble with Pages? Check out our [documentation](https://docs.github.com
 ### Math test
 
 $$x = {-b \pm \sqrt{b^2-4ac} \over 2a}.$$
+
+$$
+K(a,b) = \int \mathcal{D}x(t) \exp(2\pi i S[x]/\hbar)
+$$
