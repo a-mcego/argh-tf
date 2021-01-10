@@ -14,23 +14,25 @@ Can we count "similar vectors" using something that looks like a transformer? We
 
 What we *can* do to fix that is: for every vector V_i in N, we count how many vectors *equal to that vector* there are in the dataset. Simplified example:
 
-Dataset is: \[1, 8, 5, 5, 3, 1, 5]
+Dataset is: `[1, 8, 5, 5, 3, 1, 5]`
 
-Output should be: \[2, 1, 3, 3, 1, 2, 3] , since there are two 1s, one 8, three 5s and one 3.
+Output should be: `[2, 1, 3, 3, 1, 2, 3]` , since there are two 1s, one 8, three 5s and one 3.
 
 How to calculate something like that? We can do a pairwise equality calculation on the dataset, marking 1 if they are equal, and 0 if they are not. We get:
 
-\[1, 0, 0, 0, 0, 1, 0]
-\[0, 1, 0, 0, 0, 0, 0]
-\[0, 0, 1, 1, 0, 0, 1]
-\[0, 0, 1, 1, 0, 0, 1]
-\[0, 0, 0, 0, 1, 0, 0]
-\[1, 0, 0, 0, 0, 1, 0]
-\[0, 0, 1, 1, 0, 0, 1]
+```
+[1, 0, 0, 0, 0, 1, 0]
+[0, 1, 0, 0, 0, 0, 0]
+[0, 0, 1, 1, 0, 0, 1]
+[0, 0, 1, 1, 0, 0, 1]
+[0, 0, 0, 0, 1, 0, 0]
+[1, 0, 0, 0, 0, 1, 0]
+[0, 0, 1, 1, 0, 0, 1]
+```
 
 We see that the resulting matrix is symmetric, because a==b implies b==a. We can sum-reduce the matrix along one of the dimensions (it doesn't matter which one, since the matrix is symmetric), to get:
 
-\[2, 1, 3, 3, 1, 2, 3]
+`[2, 1, 3, 3, 1, 2, 3]`
 
 , which is exactly what we wanted.
 
