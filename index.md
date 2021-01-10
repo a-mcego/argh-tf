@@ -2,9 +2,13 @@
 
 This repo contains some of my thoughts related to solving the ARC dataset ([paper](https://arxiv.org/pdf/1911.01547.pdf) [repo](https://github.com/fchollet/ARC)).
 
+## Motivation for this text
+
+ARC has many tasks that involve counting in some form or another. Therefore, in order to solve ARC, we have to be able to count things. We can make a toy problem to test whether transformers can count.
+
 ## A toy problem: Finding the "odd one out" vector
 
-We have N vectors. N-1 of them are equal to each other, and the one that's left is different, i.e. inequal to the others. The task is to identify the "odd one out". In my tests, a normal transformer ([paper](https://arxiv.org/pdf/1706.03762.pdf)) isn't capable of solving it, if the vectors are initialized randomly before every training step. It *can* be solved, quite trivially, if the vectors are initialized once in the beginning of the program.
+We have N vectors. N-1 of them are equal to each other, and the one that's left is different, i.e. inequal to the others. The task is to identify the "odd one out". This is a trivial problem to humans. But in my tests, a normal transformer ([paper](https://arxiv.org/pdf/1706.03762.pdf)) isn't capable of solving it, if the vectors are initialized randomly before every training step. However, it *can* be solved, quite trivially, if the vectors are initialized once in the beginning of the program.
 
 We can make the observation that this is more or less a counting task: Find the vector that only appears once in the data. So we can make a hypothesis: transformers are incapable of counting abstractly. It probably has something to do with the classification not being linearly separable.
 
