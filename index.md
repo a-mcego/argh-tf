@@ -1,37 +1,13 @@
-## Welcome to GitHub Pages
+## ARGH-tf
 
-You can use the [editor on GitHub](https://github.com/a-mcego/argh-tf/edit/gh-pages/index.md) to maintain and preview the content for your website in Markdown files.
+This repo contains some of my thoughts related to solving the ARC dataset ([paper](https://arxiv.org/pdf/1911.01547.pdf) [repo](https://github.com/fchollet/ARC)).
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+# A toy problem: Finding the "odd one out" vector
 
-### Markdown
+We have N vectors. N-1 of them are equal to each other, and the one that's left is different, i.e. inequal to the others. The task is to identify the "odd one out". A normal transformer ([paper](https://arxiv.org/pdf/1706.03762.pdf)) isn't capable of solving it, if the vectors are initialized randomly.
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+We can make the observation that the task is more or less a counting task: Find the vector that only appears once in the data. So we can make a hypothesis: transformers are incapable of counting abstractly.
 
-```markdown
-Syntax highlighted code block
+# Counting
 
-# Header 1
-## Header 2
-### Header 3
-
-- Bulleted
-- List
-
-1. Numbered
-2. List
-
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
-```
-
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/a-mcego/argh-tf/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+1, 2, 3, ...
