@@ -2,13 +2,13 @@
 
 This repo contains some of my thoughts related to solving the ARC dataset ([paper](https://arxiv.org/pdf/1911.01547.pdf) [repo](https://github.com/fchollet/ARC)).
 
-## Motivation for this text
+# Motivation for this text
 
 A main reason for the existence of ARC is to have tasks that are simple or almost trivial to humans, but very difficult for computers. Here, I demonstrate one specific kind of task that is difficult to transformer networks: counting.
 
 ARC has many tasks that involve counting in some form or another. Therefore, in order to solve ARC, we have to be able to count things. We can make a toy problem to test whether transformers can count.
 
-## A toy problem: Finding the "odd one out" vector
+# Toy problem #1: Finding the "odd one out" vector
 
 We have N vectors. N-1 of them are equal to each other, and the one that's left is different, i.e. inequal to the others. The task is to identify the "odd one out". This is a trivial problem to humans. But in my tests, a normal transformer ([paper](https://arxiv.org/pdf/1706.03762.pdf)) isn't capable of solving it, if the vectors are initialized randomly before every training step. However, it *can* be solved, quite trivially, if the vectors are initialized once in the beginning of the program.
 
@@ -82,10 +82,11 @@ The result should be
 
 `[1, 1, 3, 3, 3, 2, 2]`
 
-As `cosine_similarity(V1,V2) == dot_product(V1/len(V1), V2/len(V2))` , we can normalize the dataset first, then use the dot product. The normalized dataset is (approximately):
-`[[0.000,1.000],[0.707,0.707],[-0.707,0.707],[-0.707,0.707],[-0.707,0.707],[0.743,0.669],[0.743,0.669]]
+As `cosine_similarity(V1,V2) == dot_product(V1/len(V1), V2/len(V2))` , we can normalize the dataset first, then use the dot product. The normalized dataset is approximately
 
-The pairwise dot product, after `max(x,0)`, is approximately:
+`[[0.000,1.000],[0.707,0.707],[-0.707,0.707],[-0.707,0.707],[-0.707,0.707],[0.743,0.669],[0.743,0.669]]`
+
+The pairwise dot product, after `max(x,0)`, is approximately
 ```
 [1.    0.707 0.707 0.707 0.707 0.669 0.669]
 [0.707 1.    0.    0.    0.    0.999 0.999]
@@ -108,12 +109,39 @@ My argument is that if two vectors of that size are almost equal, maybe they *sh
 
 `[1 2 2 3 3 3 4 4 4 4 5 5 5 5 5 6 6 6 6 6 6]`
 
-and the run ended with
+and the algorithm ends up with
 
 `[1.383 2.351 2.351 3.193 3.193 3.193 4.267 4.267 4.267 4.267 5.231 5.231 5.231 5.231 5.231 6.322 6.322 6.322 6.322 6.322 6.322]` 
 
-,which is very close to the real result. We could remove some of the small numbers from the similarity matrix, just like we remove the negative numbers. That actually gives exact results, but also seems like it wouldn't have a non-zero derivative.
+which is very close to the real result. We could remove some of the small numbers from the similarity matrix, just like we remove the negative numbers. That actually gives exact results. I am not sure whether we want exact results.
 
-## Comparing counting to transformer attention
+## Practical implementation
 
-To be continued...
+I have put the counting network as the first thing in the transformer layer. Ordinarily the structure of a layer is `attend to source -> attend to self -> feed-forward`, mine is thus now `counting network -> attend to source -> attend to self -> feed-forward`.
+
+The implementation of the counter network itself produces a scalar for every vector in the input. The scalar is put through a dense layer, and then is combined with the original input using another dense layer.
+
+# Toy problem #2: Reversing a sequence
+
+Many ARC tasks involve rotating the grid in some fashion. A toy version is to have a 1-dimensional sequence of vectors, and then reversing it in the output.
+
+... To be continued
+
+# Toy problem #3: Recognizing "shapes"
+
+A problem where one has to recognize shapes like "1,0,1,0,1" and "1,1,1" inside a vector that is mostly zeros.
+
+... To be continued
+
+# Toy problem #4: Counting shapes
+
+Counting runs of 1s inside a vector.
+
+... To be continued
+
+# Toy(?) problem #5: Doing these things in 2 dimensions
+
+We're going beyond one-dimensional toy problems now and stepping into the real world of two dimensions. We'll do rotoflips and shape recognition and counting (with multiple colors).
+
+... To be continued
+
