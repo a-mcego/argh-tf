@@ -11,27 +11,28 @@ class SizePredType(enum.Enum):
     CLASSIFICATION = 1
     REAL_NUMBER = 2
 
-MODEL_SIZE = 128
-XF_LAYERS = 3
+MODEL_SIZE = 160
+XF_LAYERS = 2
 XF_HEADS = 2
-LEARNING_RATE = 0.0005
-N_TASKS = 2
+LEARNING_RATE = 0.001
+LEARNING_RATE_MIN = 0.0001
+N_TASKS = 20
 ADAM_EPSILON = 1e-2
 NORMALIZE_COLUMNS = True
 SIZEPREDTYPE = SizePredType.CLASSIFICATION
 #SIZEPREDTYPE = SizePredType.REAL_NUMBER
 USE_MULTIPLE_TRANSFORMERS = True
-FFN_DROPOUT = 0.0 #doesn't work yet
 AUGMENT = True
 AUGMENT_TWISTS = True
-AUGMENT_COLORS = False
+AUGMENT_COLORS = True
 USE_COUNTER = True
-BATCH_SIZE = 4
+BATCH_SIZE = 2
 
 print(f"MODEL_SIZE={MODEL_SIZE} ",end="")
 print(f"XF_LAYERS={XF_LAYERS} ",end="")
 print(f"XF_HEADS={XF_HEADS} ",end="")
 print(f"LEARNING_RATE={LEARNING_RATE} ",end="")
+print(f"LEARNING_RATE_MIN={LEARNING_RATE_MIN} ",end="")
 print(f"N_TASKS={N_TASKS} ",end="")
 print(f"ADAM_EPSILON={ADAM_EPSILON} ",end="")
 print(f"NORMALIZE_COLUMNS={NORMALIZE_COLUMNS} ",end="")
@@ -53,6 +54,51 @@ if MODEL_SIZE % 2 != 0:
     print(f"MODEL_SIZE should be even, but is {MODEL_SIZE}")
     exit(0)
 
+def positional_embedding(pos, model_size):
+    PE = np.zeros((1, model_size))
+    for i in range(model_size):
+        if i % 2 == 0:
+            PE[:, i] = np.sin(pos / 10000 ** (i / model_size))
+        else:
+            PE[:, i] = np.cos(pos / 10000 ** ((i - 1) / model_size))
+    return PE
+
+def get_posenc(length,dim):
+    indices = np.linspace(start=0.0,stop=100.0, num=length, endpoint=True)
+
+    pes = []
+    for i in range(length):
+        pes.append(positional_embedding(indices[i], dim))
+
+    pes = np.concatenate(pes, axis=0)
+    pes = tf.constant(pes, dtype=tf.float32)
+    return pes
+
+    
+class Counting(tf.keras.Model):
+    def __init__(self, model_size):
+        super(Counting, self).__init__()
+        
+        self.counter_expander = tf.keras.layers.Dense(model_size,activation=tf.nn.softplus)
+        self.counter_merger = tf.keras.layers.Dense(model_size,use_bias=False)
+        
+    @tf.function(input_signature=[tf.TensorSpec(shape=[None,MODEL_SIZE], dtype=tf.float32)])
+    def call(self, data):
+        #cosine similarity
+        counter = tf.math.l2_normalize(data, axis=-1)
+        counter = tf.matmul(counter, counter, transpose_b=True)
+        #relu to filter out bads (this could be improved upon)
+        counter = tf.nn.relu(counter)
+        #do the count itself
+        counter = tf.reduce_sum(counter,axis=-1,keepdims=True)
+        #do postprocessing of the count.
+        counter = self.counter_expander(counter)
+        #merge the data here.
+        data = self.counter_merger(tf.concat([data,counter],axis=-1))
+        return data
+
+    
+    
 class MultiHeadAttention(tf.keras.Model):
     def __init__(self, model_size, h):
         super(MultiHeadAttention, self).__init__()
@@ -65,38 +111,15 @@ class MultiHeadAttention(tf.keras.Model):
 
         self.wo = tf.keras.layers.Dense(model_size)
         self.normalizer = 1.0/tf.math.sqrt(tf.dtypes.cast(self.head_size, tf.float32))
-
-        if USE_COUNTER:
-            self.counter_expander = tf.keras.layers.Dense(model_size,activation=tf.nn.softplus)
-            self.counter_merger = tf.keras.layers.Dense(model_size,use_bias=False)
-            self.counter_norm = tf.keras.layers.LayerNormalization()
-        
         
     def reduce(self, matrix):
-        mean = tf.math.reduce_mean(matrix, axis=0, keepdims=True)
-        stddev = tf.math.reduce_std(matrix, axis=0, keepdims=True)
-        return (matrix - mean)/stddev
+        mean = tf.math.reduce_mean(matrix, axis=-2, keepdims=True)
+        stddev = tf.math.reduce_std(matrix, axis=-2, keepdims=True)
+        return (matrix - mean)/(stddev+1e-2)
         
     @tf.function(input_signature=[tf.TensorSpec(shape=[None,MODEL_SIZE], dtype=tf.float32),tf.TensorSpec(shape=[None,MODEL_SIZE], dtype=tf.float32)])
     def call(self, query, value):
         heads = []
-
-        if USE_COUNTER:
-            #cosine similarity
-            counter = tf.math.l2_normalize(value, axis=-1)
-            counter = tf.matmul(counter, counter, transpose_b=True)
-            #relu to filter out bads (this could be improved upon)
-            counter = tf.nn.relu(counter)
-            #do the count itself
-            counter = tf.reduce_sum(counter,axis=-1)
-            counter = tf.expand_dims(counter,axis=-1)
-            #do postprocessing of the count.
-            counter = self.counter_expander(counter)
-            
-            value = self.counter_merger(tf.concat([value,counter],axis=-1))
-            value = self.counter_norm(value)
-
-        
         out_kv = self.w_kv(value)
         out_q = self.w_q(query)
         
@@ -113,7 +136,6 @@ class MultiHeadAttention(tf.keras.Model):
             wvd = out_kv[i+self.n_heads]
             
             score = tf.matmul(wqd, wkd, transpose_b=True)*self.normalizer
-
             alignment = tf.nn.softmax(score, axis=-1)
             head = tf.matmul(alignment, wvd)
             heads.append(head)
@@ -145,9 +167,11 @@ class Transformer(tf.keras.Model):
         self.dense_1 = [tf.keras.layers.Dense(model_size * 4, activation=tf.math.softplus) for _ in range(num_layers)]
         self.dense_2 = [tf.keras.layers.Dense(model_size) for _ in range(num_layers)]
         self.ffn_norm = [tf.keras.layers.LayerNormalization() for _ in range(num_layers)]
-        self.ffn_dropout = tf.keras.layers.Dropout(FFN_DROPOUT)
         
         self.use_causal_mask = use_causal_mask
+        
+        if USE_COUNTER:
+            self.counting = [Counting(model_size) for _ in range(num_layers)]
         
         
     def call(self, target_sequence, source_sequence=None, src_as_list=False):
@@ -160,6 +184,9 @@ class Transformer(tf.keras.Model):
         src_att_in = target_sequence
         for i in range(self.num_layers):
             #src_att_in has the data now
+            
+            if USE_COUNTER:
+                src_att_in = self.counting[i](src_att_in)
         
             if source_sequence is not None:
                 if src_as_list:
@@ -190,8 +217,6 @@ class Transformer(tf.keras.Model):
             ffn_in = tgt_att_out
             #ffn_in has the data now 
             ffn_mid = self.dense_1[i](ffn_in)
-            if FFN_DROPOUT > 0.0:
-                ffn_mid = self.ffn_dropout(ffn_mid,training=True)
             
             ffn_out = self.dense_2[i](ffn_mid)
 
@@ -273,7 +298,7 @@ class TaskSolver(tf.keras.Model):
         self.input_dense = tf.keras.layers.Dense(MODEL_SIZE)
         
         self.color_embedding = tf.keras.layers.Embedding(10, MODEL_SIZE)
-        self.color_embedding.trainable = True
+        self.color_embedding.trainable = False
         
         #sizes *and* coordinates
         self.coord_embedding = tf.keras.layers.Embedding(31, MODEL_SIZE//2)
@@ -291,7 +316,6 @@ class TaskSolver(tf.keras.Model):
         self.c_input_embedding = tf.keras.layers.Embedding(2, MODEL_SIZE)
         self.c_input_embedding.trainable = True
         
-        #self.xformer_COLOR = Transformer(model_size=MODEL_SIZE, num_layers=XF_LAYERS, heads=XF_HEADS, use_causal_mask=False)
         self.xformer_A = Transformer(model_size=MODEL_SIZE, num_layers=XF_LAYERS, heads=XF_HEADS, use_causal_mask=False)
         
         if USE_MULTIPLE_TRANSFORMERS:
@@ -306,10 +330,17 @@ class TaskSolver(tf.keras.Model):
         
         self.c_shape_output_real = tf.keras.layers.Dense(1)
 
-    def do_coord_embedding(self, ys, xs):
-        xs = self.coord_embedding(xs)
-        ys = self.coord_embedding(ys)
-        coords = tf.concat([ys,xs],axis=-1)
+    def do_coord_embedding(self, ys, xs, size_shape=None):
+        if size_shape is None:
+            xs = self.coord_embedding(xs)
+            ys = self.coord_embedding(ys)
+            coords = tf.concat([ys,xs],axis=-1)
+            return coords
+        ype = get_posenc(size_shape[0],dim=MODEL_SIZE//2)
+        xpe = get_posenc(size_shape[1],dim=MODEL_SIZE//2)
+        y_result = tf.gather(ype, ys)
+        x_result = tf.gather(xpe, xs)
+        coords = tf.concat([y_result,x_result],axis=-1)
         return coords
         
     def embed_grid_with_shape(self,shape):
@@ -317,7 +348,7 @@ class TaskSolver(tf.keras.Model):
         ys = tf.range(start=0, limit=shape[0])
         
         xs,ys = tf.meshgrid(xs,ys)
-        return self.do_coord_embedding(ys,xs)
+        return self.do_coord_embedding(ys,xs, shape)
         
     def embed_arc_grid(self, grid, grid_type):
         grid_out = [self.color_embedding(grid)]
@@ -409,7 +440,7 @@ steps = 0
 
 def lr_scheduler():
     global steps
-    minimum = LEARNING_RATE*0.05
+    minimum = LEARNING_RATE_MIN
     calculated = LEARNING_RATE*(2.0**(-steps/100.0))
     return max(minimum,calculated)
 
@@ -530,7 +561,6 @@ def do_step(chosen_tasks, training):
 
     totalparams = tf.reduce_sum([tf.size(tens) for tens in tasksolver.trainable_variables])
     
-
     if training:
         #print(f"             #gt {len(gradient_accum)} #p {totalparams} ", end='')
         optimizer.apply_gradients(zip(gradient_accum, tasksolver.trainable_variables))
@@ -545,13 +575,13 @@ evaluation_tasks = sorted(evaluation_tasks,key=lambda task: task.size)
 
 chosen_tasks = []
 validation_tasks = []
-for t_id in range(1,N_TASKS+1):
+for t_id in range(0,N_TASKS):
     t = training_tasks[t_id]
     for _ in range(BATCH_SIZE):
         for test_id in range(len(t.ins_test)):
             chosen_tasks.append([t.ins_train, t.outs_train, t.ins_test[test_id], t.outs_test[test_id]])
 
-    t = training_tasks[t_id]
+    t = evaluation_tasks[t_id]
     for test_id in range(len(t.ins_test)):
         validation_tasks.append([t.ins_train, t.outs_train, t.ins_test[test_id], t.outs_test[test_id]])
 
