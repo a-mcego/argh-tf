@@ -10,9 +10,9 @@ ARC has many tasks that involve counting in some form or another. Therefore, in 
 
 # Toy problem #1: Finding the "odd one out" vector
 
-We have N vectors. N-1 of them are equal to each other, and the one that's left is different, i.e. inequal to the others. The task is to identify the "odd one out". This is a trivial problem to humans. But in my tests, a normal transformer ([paper](https://arxiv.org/pdf/1706.03762.pdf)) isn't capable of solving it, if the vectors are initialized randomly before every training step. However, it *can* be solved, quite trivially, if the vectors are initialized once in the beginning of the program.
+We have N vectors. N-1 of them are equal to each other, and the one that's left is different, i.e. inequal to the others. The task is to identify the "odd one out". This is a trivial problem to humans. But in my tests, a normal transformer ([paper](https://arxiv.org/pdf/1706.03762.pdf)) isn't capable of solving it, or solves it very slowly compared to my solution, if the vectors are initialized randomly for every training example. Obviously, it works fine if the vectors are initialized once in the beginning of the program.
 
-We can make the observation that this is more or less a counting task: Find the vector that only appears once in the data. So we can make a hypothesis: transformers are incapable of counting abstractly. My hypothesis is that it has something to do with the classification not being linearly separable, because the vectors are all random, and transformers somehow cannot unrandomize them.
+We can make the observation that this is more or less a counting task: Find the vector that only appears once in the data. So we can make a hypothesis: transformers are incapable of counting abstractly very efficiently. They *can* solve the problem, just very very slowly.
 
 ## Counting
 
@@ -125,7 +125,7 @@ The implementation of the counter network itself produces a scalar for every vec
 
 Many ARC tasks involve rotating the grid in some fashion. A toy version is to have a 1-dimensional sequence of vectors, and then reversing it in the output.
 
-... To be continued
+It's quite trivially solved by a transformer using a standard positional encoding, but only if we always have the same number of timesteps. To make it work for arbitrary timesteps, we have to modify the positional encoding. Normally, the positional encoding goes `[0,1,2,3,4,...]`, increasing by one on every timestep. We can modify it to always start on `0` and always end on `100`, so a positional encoding of size 6 becomes `[0,20,40,60,80,100]` and one for size 5 becomes `[0,25,50,75,100]`. This makes it work for any lengths.
 
 # Toy problem #3: Recognizing "shapes"
 
@@ -145,3 +145,8 @@ We're going beyond one-dimensional toy problems now and stepping into the real w
 
 ... To be continued
 
+# Meta-problem: Figuring out the task from examples
+
+This is the tricky one, and also crucial for actually solving ARC. I have no workable theories yet on how to solve this. A toy version is to take the toy task #1 (of finding the one vector that is the least common), and adding another task about finding the vector that is the most common. Then, a network (of unknown architecture) looks at example input-output pairs to see which task it should solve.
+
+Angela McEgo 2021-01-13
